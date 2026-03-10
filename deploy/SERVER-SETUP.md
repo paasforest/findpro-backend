@@ -59,7 +59,7 @@ certbot --nginx -d api.findpro.co.za
 
 ## 6. Deploy updates (after code changes)
 
-Backend is in git at `findpro-backend/`. To deploy new code to Hetzner:
+**Commit** in `findpro-backend/`: `git add -A && git commit -m "message"`. **Push:** repo not on GitHub by default; add remote and push to use Option A. To deploy new code to Hetzner:
 
 **Option A – Git on server (recommended)**  
 If you’ve pushed the backend to a repo (e.g. GitHub) and cloned it on the server:
@@ -82,4 +82,4 @@ rsync -avz --exclude node_modules --exclude .env /home/immigrant/FIND\ PRO/findp
 ssh root@178.104.4.77 "cd /root/findpro-backend && npm install --production && npx prisma migrate deploy && pm2 restart findpro-api"
 ```
 
-This deploy includes **GET /api/businesses/mine** (pro dashboard “my businesses”). No new env vars or migrations needed for that endpoint.
+**Summary:** Frontend = commit in FindPro, push main → Vercel deploys. Backend = commit in findpro-backend, then on Hetzner pull (or rsync) + install + migrate + pm2 restart. This deploy includes **GET /api/businesses/mine** (pro dashboard “my businesses”). No new env vars or migrations needed for that endpoint.
