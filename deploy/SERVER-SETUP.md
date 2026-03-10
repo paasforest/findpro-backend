@@ -86,3 +86,17 @@ ssh root@178.104.4.77 "cd /root/findpro-backend && npm install --production && n
 ```
 
 **Summary:** Frontend = commit in FindPro, push main → Vercel deploys. Backend = commit in findpro-backend, then on Hetzner pull (or rsync) + install + migrate + pm2 restart. This deploy includes **GET /api/businesses/mine** (pro dashboard “my businesses”). No new env vars or migrations needed for that endpoint.
+
+**Deploy safety:** Rsync excludes `.env` (secrets unchanged) and `node_modules`. Deploy does **not** run the seed. Only effect is a short PM2 restart. Run `./deploy/deploy.sh` from the backend folder to deploy.
+
+**Remove mock data and demo pro account (run once after deploy):** The seed removes mock businesses (and their listings, reviews, media, payments) and the demo pro user `demo@findpro.co.za`. After deploying, run on the server: `cd /root/findpro-backend && npx prisma db seed`
+
+**Featured expiry (daily cron):** When admin confirms a Featured payment, the listing gets `featuredUntil` = now + 30 days. A daily job must run to set `featured = false` when that date has passed. On the server:
+
+```bash
+crontab -e
+# Add this line (runs at 01:00 every day):
+0 1 * * * cd /root/findpro-backend && node scripts/expire-featured.js >> /var/log/findpro-expire.log 2>&1
+```
+
+Or run manually: `npm run expire-featured`

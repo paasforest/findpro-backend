@@ -103,6 +103,7 @@ model Business {
   ownerId               String
   verified              Boolean               @default(false)
   featured              Boolean              @default(false)
+  featuredUntil         DateTime?            // when featured period ends; cron sets featured=false when passed
   status                BusinessStatus      @default(pending)
   source                BusinessSource       @default(manual)
   createdAt             DateTime             @default(now())

@@ -136,7 +136,7 @@ async function main() {
     },
   });
 
-  // Remove mock/demo data from production (no mock businesses)
+  // Remove mock data and everything associated: mock businesses, their listings, reviews, media, payments, then demo pro account
   const mockSlugs = [
     'spark-electric-solutions',
     'cape-plumbing-pros',
@@ -147,11 +147,17 @@ async function main() {
     'green-gardens-landscaping',
     'cleanpro-services',
   ];
-  const deleted = await prisma.business.deleteMany({ where: { slug: { in: mockSlugs } } });
-  if (deleted.count > 0) {
-    console.log(`Removed ${deleted.count} mock business(es).`);
+  const mockBusinesses = await prisma.business.findMany({ where: { slug: { in: mockSlugs } }, select: { id: true } });
+  const mockIds = mockBusinesses.map((b) => b.id);
+  if (mockIds.length > 0) {
+    await prisma.payment.deleteMany({ where: { businessId: { in: mockIds } } });
+    await prisma.business.deleteMany({ where: { id: { in: mockIds } } });
+    console.log(`Removed ${mockIds.length} mock business(es) and associated data.`);
   }
-  await prisma.user.deleteMany({ where: { email: 'demo@findpro.co.za' } }).catch(() => {});
+  const deletedUser = await prisma.user.deleteMany({ where: { email: 'demo@findpro.co.za' } });
+  if (deletedUser.count > 0) {
+    console.log('Removed demo pro account (demo@findpro.co.za).');
+  }
 
   // Backfill: ensure existing businesses have at least one service area (primary city)
   const businessesWithoutArea = await prisma.business.findMany({

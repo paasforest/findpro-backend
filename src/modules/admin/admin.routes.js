@@ -134,7 +134,9 @@ router.get('/payments/pending', async (req, res, next) => {
   }
 });
 
-/** Mark payment received → system sets Featured (no pros waiting on admin) */
+const FEATURED_DAYS = 30;
+
+/** Mark payment received → set Featured + featuredUntil (cron auto-expires when date passes) */
 router.put('/payments/:id/confirm', async (req, res, next) => {
   try {
     const payment = await prisma.payment.findUnique({
@@ -145,6 +147,7 @@ router.put('/payments/:id/confirm', async (req, res, next) => {
     if (payment.status !== 'pending') {
       return res.status(400).json({ error: 'Payment already processed' });
     }
+    const featuredUntil = new Date(Date.now() + FEATURED_DAYS * 24 * 60 * 60 * 1000);
     await prisma.$transaction([
       prisma.payment.update({
         where: { id: payment.id },
@@ -152,10 +155,13 @@ router.put('/payments/:id/confirm', async (req, res, next) => {
       }),
       prisma.business.update({
         where: { id: payment.businessId },
-        data: { featured: true },
+        data: { featured: true, featuredUntil },
       }),
     ]);
-    res.json({ message: 'Payment confirmed; listing is now Featured' });
+    res.json({
+      message: 'Payment confirmed; listing is now Featured',
+      featuredUntil: featuredUntil.toISOString().slice(0, 10),
+    });
   } catch (err) {
     next(err);
   }
