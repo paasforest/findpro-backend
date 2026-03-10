@@ -56,3 +56,30 @@ certbot --nginx -d api.findpro.co.za
 - Without domain: `http://178.104.4.77:5000/api/health` (open port 5000 in Hetzner firewall if needed).
 - With Nginx on 80: `http://178.104.4.77/api/health`
 - With domain: `https://api.findpro.co.za/api/health`
+
+## 6. Deploy updates (after code changes)
+
+Backend is in git at `findpro-backend/`. To deploy new code to Hetzner:
+
+**Option A – Git on server (recommended)**  
+If you’ve pushed the backend to a repo (e.g. GitHub) and cloned it on the server:
+
+```bash
+ssh root@178.104.4.77   # or use your key
+cd /root/findpro-backend
+git pull origin master   # or main, depending on your default branch
+npm install --production
+npx prisma migrate deploy   # if schema changed
+pm2 restart findpro-api
+```
+
+**Option B – Rsync from your machine**  
+If the server has the code but no git remote:
+
+```bash
+# From your machine (path to backend folder)
+rsync -avz --exclude node_modules --exclude .env /home/immigrant/FIND\ PRO/findpro-backend/ root@178.104.4.77:/root/findpro-backend/
+ssh root@178.104.4.77 "cd /root/findpro-backend && npm install --production && npx prisma migrate deploy && pm2 restart findpro-api"
+```
+
+This deploy includes **GET /api/businesses/mine** (pro dashboard “my businesses”). No new env vars or migrations needed for that endpoint.
