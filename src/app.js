@@ -19,7 +19,22 @@ const adminRoutes = require('./modules/admin/admin.routes');
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
+// CORS root cause: with credentials: true the server must NOT use Access-Control-Allow-Origin: *
+// or the browser blocks the response ("Failed to fetch"). So we always reflect the request origin
+// when allowed, or use allowlist from FRONTEND_URL (comma-separated).
+const corsOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
+  : [];
+const corsOptions = {
+  origin: corsOrigins.length
+    ? (origin, cb) => {
+        if (!origin || corsOrigins.includes(origin)) return cb(null, origin || corsOrigins[0]);
+        return cb(null, false);
+      }
+    : true, // no allowlist => reflect any request origin (fixes "can't fetch" when FRONTEND_URL was unset)
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(morgan('combined'));
 app.use(rateLimiter);
