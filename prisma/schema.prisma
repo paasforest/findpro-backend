@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  business_owner
+  user
+}
+
+enum ListingPlan {
+  free
+  featured
+  premium
+}
+
+enum ListingStatus {
+  active
+  pending
+  expired
+  suspended
+}
+
+enum BusinessStatus {
+  pending
+  active
+  suspended
+}
+
+enum MediaType {
+  logo
+  gallery
+  cover
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+enum BusinessSource {
+  manual
+  imported
+  google
+  scraped
+}
+
+model User {
+  id            String     @id @default(uuid())
+  name          String
+  email         String     @unique
+  phone         String?
+  passwordHash  String
+  role          Role       @default(user)
+  createdAt     DateTime   @default(now())
+  businesses    Business[]
+  reviews       Review[]
+}
+
+model Category {
+  id                  String               @id @default(uuid())
+  name                String
+  slug                String               @unique
+  icon                String
+  createdAt           DateTime             @default(now())
+  businessCategories  BusinessCategory[]
+}
+
+model City {
+  id          String     @id @default(uuid())
+  name        String
+  province    String
+  slug        String     @unique
+  createdAt   DateTime   @default(now())
+  businesses  Business[]
+}
+
+model Business {
+  id                  String             @id @default(uuid())
+  name                String
+  slug                String             @unique
+  description         String
+  phone               String
+  whatsapp            String?
+  email               String?
+  website             String?
+  logoUrl             String?
+  coverImage          String?
+  address             String?
+  cityId              String
+  ownerId             String
+  verified            Boolean            @default(false)
+  featured            Boolean            @default(false)
+  status              BusinessStatus     @default(pending)
+  source              BusinessSource     @default(manual)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  city                City               @relation(fields: [cityId], references: [id])
+  owner               User               @relation(fields: [ownerId], references: [id])
+  businessCategories  BusinessCategory[]
+  listings            Listing[]
+  reviews             Review[]
+  media               Media[]
+  payments            Payment[]
+}
+
+model BusinessCategory {
+  id          String    @id @default(uuid())
+  businessId  String
+  categoryId  String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  category    Category  @relation(fields: [categoryId], references: [id])
+
+  @@unique([businessId, categoryId])
+}
+
+model Listing {
+  id          String        @id @default(uuid())
+  businessId  String
+  plan        ListingPlan   @default(free)
+  price       Float         @default(0)
+  expiresAt   DateTime?
+  status      ListingStatus @default(pending)
+  createdAt   DateTime      @default(now())
+  business    Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  businessId  String
+  userId      String
+  rating      Int
+  comment     String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Media {
+  id          String    @id @default(uuid())
+  businessId  String
+  url         String
+  type        MediaType
+  createdAt   DateTime  @default(now())
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  businessId    String
+  amount        Float
+  currency      String        @default("ZAR")
+  status        PaymentStatus @default(pending)
+  paymentMethod String?
+  reference     String?       @unique
+  createdAt     DateTime      @default(now())
+  business      Business      @relation(fields: [businessId], references: [id])
+}
