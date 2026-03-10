@@ -15,6 +15,8 @@ const createBusinessSchema = z.object({
   address: z.string().optional(),
   cityId: z.string().uuid(),
   categories: z.array(z.string().uuid()).min(1).max(3),
+  serviceIds: z.array(z.string().uuid()).max(20).optional(),
+  cityIds: z.array(z.string().uuid()).max(50).optional(), // service areas (cities this business serves)
 });
 
 function validateCreate(req, res, next) {

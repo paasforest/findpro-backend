@@ -40,6 +40,8 @@ function buildBusinessResponse(b) {
       slug: bc.category?.slug,
       icon: bc.category?.icon,
     })),
+    services: (b.businessServices || []).map((bs) => (bs.service ? { id: bs.service.id, name: bs.service.name, slug: bs.service.slug } : null)).filter(Boolean),
+    serviceAreas: (b.businessServiceAreas || []).map((bsa) => (bsa.city ? { id: bsa.city.id, name: bsa.city.name, slug: bsa.city.slug } : null)).filter(Boolean),
     listing: b.listings?.[0] ? { plan: b.listings[0].plan, expiresAt: b.listings[0].expiresAt } : null,
     media: (b.media || []).map((m) => ({ url: m.url, type: m.type })),
     reviews: {
@@ -158,6 +160,8 @@ async function getBySlug(slug) {
 async function create(ownerId, data) {
   const baseSlug = slugify(data.name);
   const slug = await ensureUniqueSlug(baseSlug);
+  const cityIds = (data.cityIds && data.cityIds.length) ? data.cityIds : [data.cityId];
+  const serviceIds = data.serviceIds && data.serviceIds.length ? data.serviceIds : [];
 
   const business = await prisma.business.create({
     data: {
@@ -176,6 +180,10 @@ async function create(ownerId, data) {
       businessCategories: {
         create: data.categories.map((categoryId) => ({ categoryId })),
       },
+      businessServices: serviceIds.length
+        ? { create: serviceIds.map((serviceId) => ({ serviceId })) }
+        : undefined,
+      businessServiceAreas: { create: cityIds.map((cityId) => ({ cityId })) },
       listings: {
         create: { plan: 'free', status: 'pending' },
       },
@@ -183,6 +191,8 @@ async function create(ownerId, data) {
     include: {
       city: true,
       businessCategories: { include: { category: true } },
+      businessServices: { include: { service: true } },
+      businessServiceAreas: { include: { city: true } },
       listings: true,
       media: true,
       reviews: true,
