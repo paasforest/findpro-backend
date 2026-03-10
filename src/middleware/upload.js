@@ -3,7 +3,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const allowedProofTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_PROOF_SIZE = 10 * 1024 * 1024; // 10MB for proof
 
 // Memory storage for S3 upload (buffer in req.file.buffer)
 const memoryStorage = multer.memoryStorage();
@@ -36,6 +38,20 @@ const upload = multer({
   limits: { fileSize: MAX_SIZE },
 });
 
+const proofFileFilter = (req, file, cb) => {
+  if (allowedProofTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Use image (JPEG, PNG, WebP) or PDF.'), false);
+  }
+};
+
+const uploadProof = multer({
+  storage,
+  fileFilter: proofFileFilter,
+  limits: { fileSize: MAX_PROOF_SIZE },
+}).single('proof');
+
 const uploadSingle = (fieldName) => upload.single(fieldName);
 
-module.exports = { upload, uploadSingle };
+module.exports = { upload, uploadSingle, uploadProof };

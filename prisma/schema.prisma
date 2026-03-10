@@ -161,6 +161,7 @@ model Payment {
   status        PaymentStatus @default(pending)
   paymentMethod String?
   reference     String?       @unique
+  proofUrl      String?
   createdAt     DateTime      @default(now())
   business      Business      @relation(fields: [businessId], references: [id])
 }

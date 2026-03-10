@@ -120,4 +120,45 @@ router.delete('/reviews/:id', async (req, res, next) => {
   }
 });
 
+/** Pending Featured payments (proof uploaded, awaiting confirm) */
+router.get('/payments/pending', async (req, res, next) => {
+  try {
+    const list = await prisma.payment.findMany({
+      where: { status: 'pending', amount: { gt: 0 } },
+      include: { business: { select: { id: true, name: true, slug: true, featured: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Mark payment received → system sets Featured (no pros waiting on admin) */
+router.put('/payments/:id/confirm', async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.findUnique({
+      where: { id: req.params.id },
+      include: { business: true },
+    });
+    if (!payment) return res.status(404).json({ error: 'Payment not found' });
+    if (payment.status !== 'pending') {
+      return res.status(400).json({ error: 'Payment already processed' });
+    }
+    await prisma.$transaction([
+      prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'completed' },
+      }),
+      prisma.business.update({
+        where: { id: payment.businessId },
+        data: { featured: true },
+      }),
+    ]);
+    res.json({ message: 'Payment confirmed; listing is now Featured' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
