@@ -148,6 +148,8 @@ async function getBySlug(slug) {
     include: {
       city: true,
       businessCategories: { include: { category: true } },
+      businessServices: { include: { service: true } },
+      businessServiceAreas: { include: { city: true } },
       listings: { take: 1, orderBy: { createdAt: 'desc' } },
       media: true,
       reviews: { where: { status: 'approved' }, include: { user: { select: { name: true } } } },
