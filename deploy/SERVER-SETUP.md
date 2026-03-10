@@ -11,6 +11,8 @@ nano /root/findpro-backend/.env
 
 **Set these:**
 
+- `ADMIN_EMAIL` – Admin login email (default `admin@findpro.co.za`).
+- `ADMIN_PASSWORD` – Admin login password (default `ChangeMe123!`). The server ensures this admin exists on startup; set it before first run.
 - `DATABASE_URL` – Your Hetzner Managed PostgreSQL connection string (from Hetzner Cloud Console).
 - `JWT_SECRET` – A long random string (e.g. 32+ characters).
 - `FRONTEND_URL` – Your frontend origin(s) for CORS, e.g. `https://findpro.co.za` or `https://findpro.co.za,https://www.findpro.co.za` (comma-separated if you use both). Required so login/register from the site don’t get “can’t fetch” / CORS errors.

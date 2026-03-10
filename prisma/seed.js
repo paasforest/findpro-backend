@@ -127,7 +127,7 @@ async function main() {
   console.log('Seeding admin user...');
   await prisma.user.upsert({
     where: { email: adminEmail },
-    update: {},
+    update: { passwordHash: hash },
     create: {
       name: 'Admin',
       email: adminEmail,
@@ -136,55 +136,22 @@ async function main() {
     },
   });
 
-  const catList = await prisma.category.findMany();
-  const cityList = await prisma.city.findMany();
-  const admin = await prisma.user.findUnique({ where: { email: adminEmail } });
-
-  const mockBusinesses = [
-    { name: 'Spark Electric Solutions', slug: 'spark-electric-solutions', citySlug: 'johannesburg', categorySlug: 'electricians', featured: true },
-    { name: 'Cape Plumbing Pros', slug: 'cape-plumbing-pros', citySlug: 'cape-town', categorySlug: 'plumbers', featured: true },
-    { name: 'SunPower SA', slug: 'sunpower-sa', citySlug: 'durban', categorySlug: 'solar-installers', featured: true },
-    { name: 'BuildRight Construction', slug: 'buildright-construction', citySlug: 'pretoria', categorySlug: 'builders', featured: false },
-    { name: 'Perfect Painters JHB', slug: 'perfect-painters-jhb', citySlug: 'johannesburg', categorySlug: 'painters', featured: false },
-    { name: 'SecureTech CCTV', slug: 'securetech-cctv', citySlug: 'johannesburg', categorySlug: 'security-cctv', featured: true },
-    { name: 'Green Gardens Landscaping', slug: 'green-gardens-landscaping', citySlug: 'cape-town', categorySlug: 'garden-landscaping', featured: false },
-    { name: 'CleanPro Services', slug: 'cleanpro-services', citySlug: 'durban', categorySlug: 'cleaning-services', featured: false },
+  // Remove mock/demo data from production (no mock businesses)
+  const mockSlugs = [
+    'spark-electric-solutions',
+    'cape-plumbing-pros',
+    'sunpower-sa',
+    'buildright-construction',
+    'perfect-painters-jhb',
+    'securetech-cctv',
+    'green-gardens-landscaping',
+    'cleanpro-services',
   ];
-
-  console.log('Seeding mock businesses...');
-  for (const b of mockBusinesses) {
-    const city = cityList.find((c) => c.slug === b.citySlug);
-    const category = catList.find((c) => c.slug === b.categorySlug);
-    if (!city || !category) continue;
-
-    const existing = await prisma.business.findUnique({ where: { slug: b.slug } });
-    if (existing) continue;
-
-    const servicesForCategory = await prisma.service.findMany({ where: { categoryId: category.id }, take: 2 });
-    const business = await prisma.business.create({
-      data: {
-        name: b.name,
-        slug: b.slug,
-        description: 'Quality service provider in the area. Contact us for a quote.',
-        phone: '0111234567',
-        whatsapp: '27821234567',
-        email: 'info@example.co.za',
-        ownerId: admin.id,
-        cityId: city.id,
-        status: 'active',
-        source: 'imported',
-        featured: b.featured,
-        businessCategories: { create: [{ categoryId: category.id }] },
-        businessServiceAreas: { create: [{ cityId: city.id }] },
-        businessServices: servicesForCategory.length
-          ? { create: servicesForCategory.map((s) => ({ serviceId: s.id })) }
-          : undefined,
-        listings: {
-          create: { plan: b.featured ? 'featured' : 'free', status: 'active' },
-        },
-      },
-    });
+  const deleted = await prisma.business.deleteMany({ where: { slug: { in: mockSlugs } } });
+  if (deleted.count > 0) {
+    console.log(`Removed ${deleted.count} mock business(es).`);
   }
+  await prisma.user.deleteMany({ where: { email: 'demo@findpro.co.za' } }).catch(() => {});
 
   // Backfill: ensure existing businesses have at least one service area (primary city)
   const businessesWithoutArea = await prisma.business.findMany({
