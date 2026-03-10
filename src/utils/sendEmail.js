@@ -1,11 +1,21 @@
+const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
 let transporter = null;
+let resendClient = null;
+
+function getResend() {
+  if (resendClient) return resendClient;
+  if (process.env.RESEND_API_KEY) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+    return resendClient;
+  }
+  return null;
+}
 
 function getTransporter() {
   if (transporter) return transporter;
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.warn('SMTP not configured; emails will be logged only.');
     return null;
   }
   transporter = nodemailer.createTransport({
@@ -20,19 +30,50 @@ function getTransporter() {
   return transporter;
 }
 
+function getFrom() {
+  return process.env.RESEND_FROM || process.env.SMTP_USER || 'FindPro <onboarding@resend.dev>';
+}
+
 async function sendEmail({ to, subject, text, html }) {
+  const toAddress = Array.isArray(to) ? to[0] : to;
+  const plainText = text || (html && html.replace(/<[^>]*>/g, ''));
+
+  if (process.env.RESEND_API_KEY) {
+    const resend = getResend();
+    if (resend) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from: getFrom(),
+          to: toAddress,
+          subject,
+          html: html || undefined,
+          text: plainText || undefined,
+        });
+        if (error) {
+          console.warn('[Resend error]', error.message);
+          return { messageId: null };
+        }
+        return { messageId: data?.id || 'resend' };
+      } catch (e) {
+        console.warn('Resend send failed:', e.message);
+        return { messageId: null };
+      }
+    }
+  }
+
   const transport = getTransporter();
-  const mailOptions = {
-    from: process.env.SMTP_USER || 'noreply@findpro.co.za',
-    to,
-    subject,
-    text: text || (html && html.replace(/<[^>]*>/g, '')),
-    html,
-  };
   if (!transport) {
-    console.log('[Email (no SMTP)]', { to, subject, text: (text || html || '').slice(0, 100) });
+    console.log('[Email (no provider)]', { to: toAddress, subject, text: (plainText || html || '').slice(0, 100) });
     return { messageId: 'local' };
   }
+
+  const mailOptions = {
+    from: process.env.SMTP_USER || 'noreply@findpro.co.za',
+    to: toAddress,
+    subject,
+    text: plainText,
+    html,
+  };
   return transport.sendMail(mailOptions);
 }
 

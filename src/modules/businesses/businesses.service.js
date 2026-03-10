@@ -158,6 +158,19 @@ async function getBySlug(slug) {
 }
 
 async function create(ownerId, data) {
+  const existingSameNameCity = await prisma.business.findFirst({
+    where: {
+      name: { equals: data.name.trim(), mode: 'insensitive' },
+      cityId: data.cityId,
+    },
+  });
+  if (existingSameNameCity) {
+    throw Object.assign(
+      new Error('A listing with this business name already exists in this city. Use a different name or city.'),
+      { statusCode: 409 }
+    );
+  }
+
   const baseSlug = slugify(data.name);
   const slug = await ensureUniqueSlug(baseSlug);
   const cityIds = (data.cityIds && data.cityIds.length) ? data.cityIds : [data.cityId];

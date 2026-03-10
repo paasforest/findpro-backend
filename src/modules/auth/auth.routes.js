@@ -2,16 +2,21 @@ const express = require('express');
 const { z } = require('zod');
 const authController = require('./auth.controller');
 const { verifyToken } = require('../../middleware/auth');
-const { authLimiter } = require('../../middleware/rateLimiter');
+const { authLimiter, registerLimiter } = require('../../middleware/rateLimiter');
 
 const router = express.Router();
 
-const registerSchema = z.object({
-  name: z.string().min(2).max(100),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  password: z.string().min(8).max(100),
-});
+const registerSchema = z
+  .object({
+    name: z.string().min(2).max(100),
+    email: z.string().email(),
+    phone: z.string().optional(),
+    password: z.string().min(8).max(100),
+  })
+  .refine(
+    (data) => /[a-z]/.test(data.password) && /[A-Z]/.test(data.password) && /[0-9]/.test(data.password),
+    { message: 'Password must include at least one uppercase letter, one lowercase letter, and one number.', path: ['password'] }
+  );
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -32,8 +37,11 @@ function validate(schema) {
   };
 }
 
-router.post('/register', authLimiter, validate(registerSchema), authController.register);
+router.post('/register', authLimiter, registerLimiter, validate(registerSchema), authController.register);
 router.post('/login', authLimiter, validate(loginSchema), authController.login);
+router.get('/verify-email', authController.verifyEmail);
+router.post('/verify-email', authController.verifyEmail);
+router.post('/resend-verification', verifyToken, authController.resendVerification);
 router.post('/forgot-password', authLimiter, validate(forgotSchema), authController.forgotPassword);
 router.post('/reset-password', authLimiter, validate(resetSchema), authController.resetPassword);
 router.get('/me', verifyToken, authController.me);

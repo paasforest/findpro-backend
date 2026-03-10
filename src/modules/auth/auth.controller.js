@@ -49,4 +49,23 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { register, login, me, forgotPassword, resetPassword };
+async function verifyEmail(req, res, next) {
+  try {
+    const token = req.body?.token || req.query?.token;
+    const result = await authService.verifyEmail(token);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resendVerification(req, res, next) {
+  try {
+    const result = await authService.resendVerification(req.user.id);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, me, verifyEmail, resendVerification, forgotPassword, resetPassword };

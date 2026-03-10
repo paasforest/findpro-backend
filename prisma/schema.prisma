@@ -53,15 +53,18 @@ enum BusinessSource {
 }
 
 model User {
-  id            String     @id @default(uuid())
-  name          String
-  email         String     @unique
-  phone         String?
-  passwordHash  String
-  role          Role       @default(user)
-  createdAt     DateTime   @default(now())
-  businesses    Business[]
-  reviews       Review[]
+  id                         String    @id @default(uuid())
+  name                       String
+  email                      String    @unique
+  phone                      String?
+  passwordHash               String
+  role                       Role      @default(user)
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?
+  emailVerificationExpiresAt DateTime?
+  createdAt                  DateTime  @default(now())
+  businesses                 Business[]
+  reviews                    Review[]
 }
 
 model Category {
