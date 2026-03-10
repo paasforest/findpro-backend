@@ -23,13 +23,34 @@ app.use(helmet());
 // CORS root cause: with credentials: true the server must NOT use Access-Control-Allow-Origin: *
 // or the browser blocks the response ("Failed to fetch"). So we always reflect the request origin
 // when allowed, or use allowlist from FRONTEND_URL (comma-separated).
+// Also allow www/non-www sibling: if FRONTEND_URL has https://findpro.co.za, allow https://www.findpro.co.za too.
 const corsOrigins = process.env.FRONTEND_URL
   ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
   : [];
+
+function originSibling(origin) {
+  try {
+    const u = new URL(origin);
+    const host = u.hostname;
+    const siblingHost = host.startsWith('www.') ? host.slice(4) : 'www.' + host;
+    return u.protocol + '//' + siblingHost + (u.port ? ':' + u.port : '');
+  } catch {
+    return null;
+  }
+}
+
+function isOriginAllowed(origin) {
+  if (!origin) return true;
+  if (corsOrigins.includes(origin)) return true;
+  const sibling = originSibling(origin);
+  return sibling && corsOrigins.includes(sibling);
+}
+
 const corsOptions = {
   origin: corsOrigins.length
     ? (origin, cb) => {
-        if (!origin || corsOrigins.includes(origin)) return cb(null, origin || corsOrigins[0]);
+        if (!origin) return cb(null, corsOrigins[0]);
+        if (isOriginAllowed(origin)) return cb(null, origin);
         return cb(null, false);
       }
     : true, // no allowlist => reflect any request origin (fixes "can't fetch" when FRONTEND_URL was unset)
