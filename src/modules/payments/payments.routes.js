@@ -10,7 +10,8 @@ const s3 = require('../../config/storage');
 
 const router = express.Router();
 
-const FEATURED_AMOUNT = 50;
+const FEATURED_AMOUNT = Number(process.env.FEATURED_AMOUNT) || 79;
+const PREMIUM_AMOUNT = Number(process.env.PREMIUM_AMOUNT) || 99;
 
 function getBankDetails() {
   return {
@@ -61,12 +62,58 @@ router.post('/request-featured', verifyToken, async (req, res, next) => {
         status: 'pending',
         paymentMethod: 'eft',
         reference,
+        product: 'featured',
       },
     });
     res.status(201).json({
       paymentId: payment.id,
       reference: payment.reference,
       amount: FEATURED_AMOUNT,
+      bankDetails: getBankDetails(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Request Premium upgrade – same flow as Featured, different amount and product */
+router.post('/request-premium', verifyToken, async (req, res, next) => {
+  try {
+    const { businessId } = req.body;
+    if (!businessId) {
+      return res.status(400).json({ error: 'businessId required' });
+    }
+    const business = await prisma.business.findFirst({
+      where: { id: businessId, ownerId: req.user.id },
+    });
+    if (!business) {
+      return res.status(403).json({ error: 'Not your business' });
+    }
+    let reference;
+    let existing = null;
+    for (let i = 0; i < 5; i++) {
+      reference = generateReference();
+      existing = await prisma.payment.findUnique({ where: { reference } });
+      if (!existing) break;
+    }
+    if (existing) {
+      return res.status(500).json({ error: 'Could not generate unique reference' });
+    }
+    const payment = await prisma.payment.create({
+      data: {
+        businessId,
+        amount: PREMIUM_AMOUNT,
+        currency: 'ZAR',
+        status: 'pending',
+        paymentMethod: 'eft',
+        reference,
+        product: 'premium',
+      },
+    });
+    res.status(201).json({
+      paymentId: payment.id,
+      reference: payment.reference,
+      amount: PREMIUM_AMOUNT,
       bankDetails: getBankDetails(),
     });
   } catch (err) {
@@ -139,7 +186,7 @@ router.post('/initiate', verifyToken, async (req, res, next) => {
     if (!businessId || !plan) {
       return res.status(400).json({ error: 'businessId and plan required' });
     }
-    const amount = plan === 'featured' ? 50 : plan === 'premium' ? 100 : 0;
+    const amount = plan === 'featured' ? FEATURED_AMOUNT : plan === 'premium' ? PREMIUM_AMOUNT : 0;
     const payment = await prisma.payment.create({
       data: { businessId, amount, status: 'pending', reference: 'PF-' + Date.now() },
     });

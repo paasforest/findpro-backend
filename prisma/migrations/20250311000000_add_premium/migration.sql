@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "premium" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Business" ADD COLUMN IF NOT EXISTS "premiumUntil" TIMESTAMP(3);
+
+-- AlterTable
+ALTER TABLE "Payment" ADD COLUMN IF NOT EXISTS "product" TEXT NOT NULL DEFAULT 'featured';

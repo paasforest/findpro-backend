@@ -120,12 +120,12 @@ router.delete('/reviews/:id', async (req, res, next) => {
   }
 });
 
-/** Pending Featured payments (proof uploaded, awaiting confirm) */
+/** Pending payments (Featured or Premium – proof uploaded, awaiting confirm) */
 router.get('/payments/pending', async (req, res, next) => {
   try {
     const list = await prisma.payment.findMany({
       where: { status: 'pending', amount: { gt: 0 } },
-      include: { business: { select: { id: true, name: true, slug: true, featured: true } } },
+      include: { business: { select: { id: true, name: true, slug: true, featured: true, premium: true } } },
       orderBy: { createdAt: 'desc' },
     });
     res.json(list);
@@ -134,9 +134,9 @@ router.get('/payments/pending', async (req, res, next) => {
   }
 });
 
-const FEATURED_DAYS = 30;
+const PLAN_DAYS = 30;
 
-/** Mark payment received → set Featured + featuredUntil (cron auto-expires when date passes) */
+/** Mark payment received → set Featured or Premium + until date (cron auto-expires when date passes) */
 router.put('/payments/:id/confirm', async (req, res, next) => {
   try {
     const payment = await prisma.payment.findUnique({
@@ -147,7 +147,11 @@ router.put('/payments/:id/confirm', async (req, res, next) => {
     if (payment.status !== 'pending') {
       return res.status(400).json({ error: 'Payment already processed' });
     }
-    const featuredUntil = new Date(Date.now() + FEATURED_DAYS * 24 * 60 * 60 * 1000);
+    const until = new Date(Date.now() + PLAN_DAYS * 24 * 60 * 60 * 1000);
+    const isPremium = payment.product === 'premium';
+    const updateBusiness = isPremium
+      ? { premium: true, premiumUntil: until }
+      : { featured: true, featuredUntil: until };
     await prisma.$transaction([
       prisma.payment.update({
         where: { id: payment.id },
@@ -155,12 +159,12 @@ router.put('/payments/:id/confirm', async (req, res, next) => {
       }),
       prisma.business.update({
         where: { id: payment.businessId },
-        data: { featured: true, featuredUntil },
+        data: updateBusiness,
       }),
     ]);
     res.json({
-      message: 'Payment confirmed; listing is now Featured',
-      featuredUntil: featuredUntil.toISOString().slice(0, 10),
+      message: isPremium ? 'Payment confirmed; listing is now Premium' : 'Payment confirmed; listing is now Featured',
+      until: until.toISOString().slice(0, 10),
     });
   } catch (err) {
     next(err);

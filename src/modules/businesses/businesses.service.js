@@ -31,6 +31,9 @@ function buildBusinessResponse(b) {
     coverImage: b.coverImage,
     address: b.address,
     featured: b.featured,
+    featuredUntil: b.featuredUntil,
+    premium: b.premium,
+    premiumUntil: b.premiumUntil,
     verified: b.verified,
     status: b.status,
     city: b.city ? { id: b.city.id, name: b.city.name, slug: b.city.slug, province: b.city.province } : null,
@@ -82,8 +85,7 @@ async function list(filters) {
   const total = await prisma.business.count({ where });
   const { skip, limit: take } = paginate(page, limit, total);
 
-  let orderBy = { createdAt: 'desc' };
-  if (sort === 'featured') orderBy = [{ featured: 'desc' }, { createdAt: 'desc' }];
+  let orderBy = [{ premium: 'desc' }, { featured: 'desc' }, { createdAt: 'desc' }];
   if (sort === 'az') orderBy = { name: 'asc' };
 
   const list = await prisma.business.findMany({
@@ -111,9 +113,9 @@ async function list(filters) {
 async function getFeatured(limit) {
   const take = limit || 6;
   const list = await prisma.business.findMany({
-    where: { status: 'active', featured: true },
+    where: { status: 'active', OR: [{ featured: true }, { premium: true }] },
     take: take,
-    orderBy: { createdAt: 'desc' },
+    orderBy: [{ premium: 'desc' }, { featured: 'desc' }, { createdAt: 'desc' }],
     include: {
       city: true,
       businessCategories: { include: { category: true } },
