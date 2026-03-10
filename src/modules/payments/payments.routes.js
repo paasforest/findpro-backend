@@ -4,6 +4,16 @@ const { verifyToken } = require('../../middleware/auth');
 
 const router = express.Router();
 
+/** Bank details for Featured listing EFT (no auth – shown in modal) */
+router.get('/bank-details', (req, res) => {
+  res.json({
+    bankName: process.env.BANK_NAME || 'ABSA BANK',
+    branchCode: process.env.BANK_BRANCH_CODE || '632005',
+    accountNumber: (process.env.BANK_ACCOUNT_NUMBER || '4115223741').replace(/\s/g, ''),
+    accountName: process.env.BANK_ACCOUNT_NAME || 'FindPro',
+  });
+});
+
 router.post('/initiate', verifyToken, async (req, res, next) => {
   try {
     const { businessId, plan } = req.body;
