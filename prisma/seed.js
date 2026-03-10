@@ -29,6 +29,63 @@ const cities = [
   { name: 'Kimberley', province: 'Northern Cape', slug: 'kimberley' },
 ];
 
+// Services per category (categorySlug -> list of { name, slug }). Enables filter-by-service like other directories.
+const servicesByCategory = {
+  electricians: [
+    { name: 'COC certificates', slug: 'coc-certificates' },
+    { name: 'Fault finding', slug: 'fault-finding' },
+    { name: 'Solar wiring', slug: 'solar-wiring' },
+    { name: 'Rewiring', slug: 'rewiring' },
+    { name: 'DB board upgrades', slug: 'db-board-upgrades' },
+  ],
+  plumbers: [
+    { name: 'Geyser installation & repair', slug: 'geyser-installation-repair' },
+    { name: 'Blockages', slug: 'blockages' },
+    { name: 'Bathroom plumbing', slug: 'bathroom-plumbing' },
+    { name: 'Leak detection', slug: 'leak-detection' },
+  ],
+  'solar-installers': [
+    { name: 'Solar panel installation', slug: 'solar-panel-installation' },
+    { name: 'Inverter installation', slug: 'inverter-installation' },
+    { name: 'Battery storage', slug: 'battery-storage' },
+  ],
+  builders: [
+    { name: 'Renovations', slug: 'renovations' },
+    { name: 'New builds', slug: 'new-builds' },
+    { name: 'Extensions', slug: 'extensions' },
+  ],
+  painters: [
+    { name: 'Interior painting', slug: 'interior-painting' },
+    { name: 'Exterior painting', slug: 'exterior-painting' },
+    { name: 'Spray painting', slug: 'spray-painting' },
+  ],
+  'cleaning-services': [
+    { name: 'Deep cleaning', slug: 'deep-cleaning' },
+    { name: 'Regular domestic', slug: 'regular-domestic' },
+    { name: 'Office cleaning', slug: 'office-cleaning' },
+  ],
+  'security-cctv': [
+    { name: 'CCTV installation', slug: 'cctv-installation' },
+    { name: 'Alarm systems', slug: 'alarm-systems' },
+    { name: 'Access control', slug: 'access-control' },
+  ],
+  'appliance-repair': [
+    { name: 'Fridge & freezer', slug: 'fridge-freezer' },
+    { name: 'Washing machine', slug: 'washing-machine' },
+    { name: 'Stove & oven', slug: 'stove-oven' },
+  ],
+  'pest-control': [
+    { name: 'Fumigation', slug: 'fumigation' },
+    { name: 'Rodent control', slug: 'rodent-control' },
+    { name: 'Termite treatment', slug: 'termite-treatment' },
+  ],
+  'garden-landscaping': [
+    { name: 'Garden design', slug: 'garden-design' },
+    { name: 'Lawn installation', slug: 'lawn-installation' },
+    { name: 'Irrigation', slug: 'irrigation' },
+  ],
+};
+
 async function main() {
   console.log('Seeding categories...');
   for (const c of categories) {
@@ -46,6 +103,21 @@ async function main() {
       update: {},
       create: c,
     });
+  }
+
+  console.log('Seeding services (per category)...');
+  const catListForServices = await prisma.category.findMany();
+  for (const [categorySlug, services] of Object.entries(servicesByCategory)) {
+    const category = catListForServices.find((c) => c.slug === categorySlug);
+    if (!category) continue;
+    for (let i = 0; i < services.length; i++) {
+      const s = services[i];
+      await prisma.service.upsert({
+        where: { slug: s.slug },
+        update: {},
+        create: { name: s.name, slug: s.slug, categoryId: category.id, sortOrder: i },
+      });
+    }
   }
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@findpro.co.za';
@@ -88,6 +160,7 @@ async function main() {
     const existing = await prisma.business.findUnique({ where: { slug: b.slug } });
     if (existing) continue;
 
+    const servicesForCategory = await prisma.service.findMany({ where: { categoryId: category.id }, take: 2 });
     const business = await prisma.business.create({
       data: {
         name: b.name,
@@ -102,11 +175,31 @@ async function main() {
         source: 'imported',
         featured: b.featured,
         businessCategories: { create: [{ categoryId: category.id }] },
+        businessServiceAreas: { create: [{ cityId: city.id }] },
+        businessServices: servicesForCategory.length
+          ? { create: servicesForCategory.map((s) => ({ serviceId: s.id })) }
+          : undefined,
         listings: {
           create: { plan: b.featured ? 'featured' : 'free', status: 'active' },
         },
       },
     });
+  }
+
+  // Backfill: ensure existing businesses have at least one service area (primary city)
+  const businessesWithoutArea = await prisma.business.findMany({
+    where: { businessServiceAreas: { none: {} } },
+    select: { id: true, cityId: true },
+  });
+  for (const b of businessesWithoutArea) {
+    await prisma.businessServiceArea.upsert({
+      where: { businessId_cityId: { businessId: b.id, cityId: b.cityId } },
+      update: {},
+      create: { businessId: b.id, cityId: b.cityId },
+    });
+  }
+  if (businessesWithoutArea.length > 0) {
+    console.log(`Backfilled service area for ${businessesWithoutArea.length} existing business(es).`);
   }
 
   console.log('Seed complete.');

@@ -71,44 +71,48 @@ model Category {
   icon                String
   createdAt           DateTime             @default(now())
   businessCategories  BusinessCategory[]
+  services            Service[]            // services often offered in this category (e.g. Electricians → COC, Solar)
 }
 
 model City {
-  id          String     @id @default(uuid())
-  name        String
-  province    String
-  slug        String     @unique
-  createdAt   DateTime   @default(now())
-  businesses  Business[]
+  id                    String                @id @default(uuid())
+  name                  String
+  province              String
+  slug                  String                @unique
+  createdAt             DateTime              @default(now())
+  businesses            Business[]
+  businessServiceAreas  BusinessServiceArea[]  // businesses that serve this city
 }
 
 model Business {
-  id                  String             @id @default(uuid())
-  name                String
-  slug                String             @unique
-  description         String
-  phone               String
-  whatsapp            String?
-  email               String?
-  website             String?
-  logoUrl             String?
-  coverImage          String?
-  address             String?
-  cityId              String
-  ownerId             String
-  verified            Boolean            @default(false)
-  featured            Boolean            @default(false)
-  status              BusinessStatus     @default(pending)
-  source              BusinessSource     @default(manual)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  city                City               @relation(fields: [cityId], references: [id])
-  owner               User               @relation(fields: [ownerId], references: [id])
-  businessCategories  BusinessCategory[]
-  listings            Listing[]
-  reviews             Review[]
-  media               Media[]
-  payments            Payment[]
+  id                    String                @id @default(uuid())
+  name                  String
+  slug                  String                @unique
+  description           String
+  phone                 String
+  whatsapp              String?
+  email                 String?
+  website               String?
+  logoUrl               String?
+  coverImage            String?
+  address               String?
+  cityId                String                // primary/base city
+  ownerId               String
+  verified              Boolean               @default(false)
+  featured              Boolean              @default(false)
+  status                BusinessStatus      @default(pending)
+  source                BusinessSource       @default(manual)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  city                  City                 @relation(fields: [cityId], references: [id])
+  owner                 User                 @relation(fields: [ownerId], references: [id])
+  businessCategories    BusinessCategory[]
+  businessServices      BusinessService[]    // services this business offers (required for listing)
+  businessServiceAreas  BusinessServiceArea[] // cities/areas this business serves (required for listing)
+  listings              Listing[]
+  reviews               Review[]
+  media                 Media[]
+  payments              Payment[]
 }
 
 model BusinessCategory {
@@ -119,6 +123,40 @@ model BusinessCategory {
   category    Category  @relation(fields: [categoryId], references: [id])
 
   @@unique([businessId, categoryId])
+}
+
+// Master list of services (e.g. COC certificates, Solar installation). Enables filter-by-service like other directories.
+model Service {
+  id                  String           @id @default(uuid())
+  name                String
+  slug                String           @unique
+  categoryId          String?          // optional: scope to category (e.g. Electricians)
+  sortOrder           Int              @default(0)
+  createdAt           DateTime        @default(now())
+  category            Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  businessServices    BusinessService[]
+}
+
+// Which services does this business offer? (many-to-many). Required for a valid listing.
+model BusinessService {
+  id          String    @id @default(uuid())
+  businessId  String
+  serviceId   String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  service     Service   @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, serviceId])
+}
+
+// Which cities/areas does this business serve? (many-to-many). Required for a valid listing; at least one.
+model BusinessServiceArea {
+  id          String    @id @default(uuid())
+  businessId  String
+  cityId      String
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  city        City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, cityId])
 }
 
 model Listing {
