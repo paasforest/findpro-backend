@@ -70,6 +70,11 @@ router.get('/businesses/pending', async (req, res, next) => {
 
 router.put('/businesses/:id/approve', async (req, res, next) => {
   try {
+    const business = await prisma.business.findUnique({
+      where: { id: req.params.id },
+      include: { owner: { select: { email: true, name: true } } },
+    });
+    if (!business) return res.status(404).json({ error: 'Business not found' });
     await prisma.business.update({
       where: { id: req.params.id },
       data: { status: 'active' },
@@ -78,6 +83,19 @@ router.put('/businesses/:id/approve', async (req, res, next) => {
       where: { businessId: req.params.id },
       data: { status: 'active' },
     });
+    try {
+      if (business.owner?.email) {
+        const listingUrl = `${process.env.FRONTEND_URL || 'https://findpro.co.za'}/business/${business.slug}`;
+        await sendEmail({
+          to: business.owner.email,
+          subject: `Your listing "${business.name}" is now live – FindPro`,
+          text: `Hi ${business.owner.name || 'there'}, your listing "${business.name}" has been approved and is now live on FindPro. View it here: ${listingUrl}. Manage it from your dashboard.`,
+          html: `<p>Hi ${business.owner.name || 'there'},</p><p>Your listing <strong>${business.name}</strong> has been approved and is now live on FindPro.</p><p><a href="${listingUrl}">View your listing</a> · <a href="${process.env.FRONTEND_URL || 'https://findpro.co.za'}/dashboard">Dashboard</a></p>`,
+        });
+      }
+    } catch (e) {
+      console.warn('Listing-approved email failed:', e.message);
+    }
     res.json({ message: 'Approved' });
   } catch (err) {
     next(err);
@@ -86,10 +104,27 @@ router.put('/businesses/:id/approve', async (req, res, next) => {
 
 router.put('/businesses/:id/reject', async (req, res, next) => {
   try {
+    const business = await prisma.business.findUnique({
+      where: { id: req.params.id },
+      include: { owner: { select: { email: true, name: true } } },
+    });
+    if (!business) return res.status(404).json({ error: 'Business not found' });
     await prisma.business.update({
       where: { id: req.params.id },
       data: { status: 'suspended' },
     });
+    try {
+      if (business.owner?.email) {
+        await sendEmail({
+          to: business.owner.email,
+          subject: `Update on your listing "${business.name}" – FindPro`,
+          text: `Hi ${business.owner.name || 'there'}, your listing "${business.name}" was not approved at this time. If you have questions, please reply to this email or contact us.`,
+          html: `<p>Hi ${business.owner.name || 'there'},</p><p>Your listing <strong>${business.name}</strong> was not approved at this time.</p><p>If you have questions, please reply to this email or contact us.</p>`,
+        });
+      }
+    } catch (e) {
+      console.warn('Listing-rejected email failed:', e.message);
+    }
     res.json({ message: 'Rejected' });
   } catch (err) {
     next(err);
@@ -155,6 +190,94 @@ router.delete('/reviews/:id', async (req, res, next) => {
   try {
     await prisma.review.delete({ where: { id: req.params.id } });
     res.json({ message: 'Deleted' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const bulkImportRowSchema = z.object({
+  name: z.string().min(2).max(100),
+  phone: z.string().transform((s) => s.replace(/\s/g, '').replace(/^\+27/, '0')).pipe(z.string().regex(/^0[0-9]{9}$/)),
+  city: z.string().min(1).max(100),
+  category: z.string().min(1).max(100),
+});
+
+/** Bulk create unclaimed listings from JSON body. Body: { rows: [ { name, phone, city, category } ] } where city and category are slugs. */
+router.post('/businesses/bulk-import', async (req, res, next) => {
+  try {
+    const { rows } = req.body || {};
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'Body must include rows: [ { name, phone, city, category } ]' });
+    }
+    const unclaimedId = await getUnclaimedUserId();
+    if (!unclaimedId) return res.status(500).json({ error: 'Unclaimed user not configured' });
+
+    const cities = await prisma.city.findMany({ select: { id: true, slug: true } });
+    const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
+    const cityBySlug = new Map(cities.map((c) => [c.slug.toLowerCase(), c.id]));
+    const categoryBySlug = new Map(categories.map((c) => [c.slug.toLowerCase(), c.id]));
+
+    const results = { created: 0, failed: 0, errors: [] };
+    const description = 'Claim this business to add your description and take control of your listing on FindPro.';
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 1;
+      const parsed = bulkImportRowSchema.safeParse(row);
+      if (!parsed.success) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name: row?.name, error: parsed.error.flatten().fieldErrors ? JSON.stringify(parsed.error.flatten().fieldErrors) : 'Validation failed' });
+        continue;
+      }
+      const { name, phone, city: citySlug, category: categorySlug } = parsed.data;
+      const cityId = cityBySlug.get(citySlug.toLowerCase());
+      const categoryId = categoryBySlug.get(categorySlug.toLowerCase());
+      if (!cityId) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name, error: `City not found: ${citySlug}` });
+        continue;
+      }
+      if (!categoryId) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name, error: `Category not found: ${categorySlug}` });
+        continue;
+      }
+
+      const existing = await prisma.business.findFirst({
+        where: { name: { equals: name.trim(), mode: 'insensitive' }, cityId },
+      });
+      if (existing) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name, error: 'A business with this name already exists in this city' });
+        continue;
+      }
+
+      try {
+        const baseSlug = slugify(name);
+        const slug = await ensureUniqueSlug(baseSlug);
+        await prisma.business.create({
+          data: {
+            name: name.trim(),
+            slug,
+            description,
+            phone,
+            cityId,
+            ownerId: unclaimedId,
+            status: 'active',
+            source: 'manual',
+            businessCategories: { create: [{ categoryId }] },
+            businessServiceAreas: { create: [{ cityId }] },
+            listings: { create: { plan: 'free', status: 'active' } },
+          },
+        });
+        results.created++;
+      } catch (err) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name, error: err.message || 'Create failed' });
+      }
+    }
+
+    res.json(results);
   } catch (err) {
     next(err);
   }

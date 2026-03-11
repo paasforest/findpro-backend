@@ -16,6 +16,7 @@ const reviewRoutes = require('./modules/reviews/reviews.routes');
 const paymentRoutes = require('./modules/payments/payments.routes');
 const servicesRoutes = require('./modules/services/services.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const claimRoutes = require('./modules/claim/claim.routes');
 
 const app = express();
 
@@ -71,6 +72,7 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/claim', claimRoutes);
 
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 

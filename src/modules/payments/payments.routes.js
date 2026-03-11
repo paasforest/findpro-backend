@@ -12,6 +12,10 @@ const router = express.Router();
 
 const FEATURED_AMOUNT = Number(process.env.FEATURED_AMOUNT) || 79;
 const PREMIUM_AMOUNT = Number(process.env.PREMIUM_AMOUNT) || 99;
+const BOOST_AMOUNT = Number(process.env.BOOST_AMOUNT) || 25;
+const HOMEPAGE_SLOT_AMOUNT = Number(process.env.HOMEPAGE_SLOT_AMOUNT) || 175;
+const CITY_AD_AMOUNT = Number(process.env.CITY_AD_AMOUNT) || 200;
+const VERIFIED_AMOUNT = Number(process.env.VERIFIED_AMOUNT) || 30;
 
 function getBankDetails() {
   return {
@@ -116,6 +120,74 @@ router.post('/request-premium', verifyToken, async (req, res, next) => {
       amount: PREMIUM_AMOUNT,
       bankDetails: getBankDetails(),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Phase 3: Request Boost (R25, 7 days) */
+async function requestProduct(req, res, product, amount) {
+  const { businessId } = req.body;
+  if (!businessId) return res.status(400).json({ error: 'businessId required' });
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, ownerId: req.user.id },
+  });
+  if (!business) return res.status(403).json({ error: 'Not your business' });
+  let reference;
+  let existing = null;
+  for (let i = 0; i < 5; i++) {
+    reference = generateReference();
+    existing = await prisma.payment.findUnique({ where: { reference } });
+    if (!existing) break;
+  }
+  if (existing) return res.status(500).json({ error: 'Could not generate unique reference' });
+  const payment = await prisma.payment.create({
+    data: {
+      businessId,
+      amount,
+      currency: 'ZAR',
+      status: 'pending',
+      paymentMethod: 'eft',
+      reference,
+      product,
+    },
+  });
+  return res.status(201).json({
+    paymentId: payment.id,
+    reference: payment.reference,
+    amount,
+    bankDetails: getBankDetails(),
+  });
+}
+
+router.post('/request-boost', verifyToken, async (req, res, next) => {
+  try {
+    await requestProduct(req, res, 'boost', BOOST_AMOUNT);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/request-homepage-slot', verifyToken, async (req, res, next) => {
+  try {
+    await requestProduct(req, res, 'homepage_slot', HOMEPAGE_SLOT_AMOUNT);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/request-city-ad', verifyToken, async (req, res, next) => {
+  try {
+    await requestProduct(req, res, 'city_ad', CITY_AD_AMOUNT);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Phase 4: Request Verified badge (R30 one-off) */
+router.post('/request-verified', verifyToken, async (req, res, next) => {
+  try {
+    await requestProduct(req, res, 'verified', VERIFIED_AMOUNT);
   } catch (err) {
     next(err);
   }

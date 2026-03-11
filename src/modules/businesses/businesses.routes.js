@@ -31,10 +31,12 @@ function validateCreate(req, res, next) {
 router.get('/', businessesController.list);
 router.get('/featured', businessesController.getFeatured);
 router.get('/recent', businessesController.getRecent);
+router.get('/homepage-slots', businessesController.getHomepageSlots);
 router.get('/mine', verifyToken, businessesController.getMine);
 router.get('/category/:categorySlug', businessesController.getByCategory);
 router.get('/city/:citySlug', businessesController.getByCity);
 router.get('/category/:categorySlug/city/:citySlug', businessesController.getByCategoryAndCity);
+router.post('/:id/record-view', businessesController.recordView);
 router.get('/:slug', businessesController.getBySlug);
 
 router.post('/', verifyToken, validateCreate, businessesController.create);

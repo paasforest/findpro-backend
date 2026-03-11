@@ -31,7 +31,7 @@ function getTransporter() {
 }
 
 function getFrom() {
-  return process.env.RESEND_FROM || process.env.SMTP_USER || 'FindPro <onboarding@resend.dev>';
+  return process.env.RESEND_FROM || process.env.SMTP_USER || 'FindPro <noreply@mail.findpro.co.za>';
 }
 
 async function sendEmail({ to, subject, text, html }) {

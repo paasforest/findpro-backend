@@ -45,10 +45,13 @@ async function register(name, email, phone, password) {
     console.warn('Verification email failed:', e.message);
   }
   try {
+    const dashboardUrl = `${frontendUrl}/dashboard`;
+    const addBusinessUrl = `${frontendUrl}/add-business`;
     await sendEmail({
       to: email,
-      subject: 'Welcome to FindPro',
-      text: `Hi ${name}, welcome to FindPro. Verify your email to get the most out of your listing.`,
+      subject: 'Welcome to FindPro – List your business',
+      text: `Hi ${name},\n\nWelcome to FindPro. You're one step away from getting in front of customers.\n\n1. Verify your email using the link we just sent you.\n2. Add your business: ${addBusinessUrl}\n3. Once approved, your listing goes live. Upgrade to Featured or Premium from your dashboard to stand out.\n\nDashboard: ${dashboardUrl}\n\nQuestions? Reply to this email or visit findpro.co.za.`,
+      html: `<p>Hi ${name},</p><p>Welcome to <strong>FindPro</strong>. You're one step away from getting in front of customers.</p><ol><li>Verify your email using the link we just sent you.</li><li><a href="${addBusinessUrl}">Add your business</a></li><li>Once approved, your listing goes live. Upgrade to Featured or Premium from your dashboard to stand out.</li></ol><p><a href="${dashboardUrl}">Go to your Dashboard</a></p><p>Questions? Reply to this email or visit findpro.co.za.</p>`,
     });
   } catch (e) {
     console.warn('Welcome email failed:', e.message);
@@ -65,7 +68,7 @@ async function verifyEmail(token) {
   if (!token) throw Object.assign(new Error('Verification token required'), { statusCode: 400 });
   const user = await prisma.user.findFirst({
     where: { emailVerificationToken: token },
-    select: { id: true, emailVerificationExpiresAt: true },
+    select: { id: true, name: true, email: true, emailVerificationExpiresAt: true },
   });
   if (!user) throw Object.assign(new Error('Invalid or expired verification link'), { statusCode: 400 });
   if (user.emailVerificationExpiresAt && user.emailVerificationExpiresAt < new Date()) {
@@ -75,6 +78,17 @@ async function verifyEmail(token) {
     where: { id: user.id },
     data: { emailVerified: true, emailVerificationToken: null, emailVerificationExpiresAt: null },
   });
+  try {
+    const dashboardUrl = `${process.env.FRONTEND_URL || 'https://findpro.co.za'}/dashboard`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Your email is verified – FindPro',
+      text: `Hi ${user.name}, your email is verified. You're all set. Add your business or manage your dashboard: ${dashboardUrl}`,
+      html: `<p>Hi ${user.name},</p><p>Your email is verified. You're all set.</p><p><a href="${dashboardUrl}">Go to your Dashboard</a> to add your business or manage your listings.</p>`,
+    });
+  } catch (e) {
+    console.warn('Email-verified confirmation failed:', e.message);
+  }
   return { message: 'Email verified. You can now use your account fully.' };
 }
 
