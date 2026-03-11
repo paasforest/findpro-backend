@@ -9,6 +9,7 @@ async function list(req, res, next) {
       status: req.query.status,
       plan: req.query.plan,
       search: req.query.search,
+      verified: req.query.verified,
       page: req.query.page,
       limit: req.query.limit,
       sort: req.query.sort,
@@ -39,6 +40,16 @@ async function getRecent(req, res, next) {
   }
 }
 
+async function getHomepageSlots(req, res, next) {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 8;
+    const data = await businessesService.getHomepageSlots(limit);
+    res.json(data);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getBySlug(req, res, next) {
   try {
     const business = await businessesService.getBySlug(req.params.slug);
@@ -55,6 +66,8 @@ async function getByCategory(req, res, next) {
   try {
     const result = await businessesService.list({
       category: req.params.categorySlug,
+      verified: req.query.verified,
+      search: req.query.search,
       page: req.query.page,
       limit: req.query.limit,
       sort: req.query.sort,
@@ -69,6 +82,8 @@ async function getByCity(req, res, next) {
   try {
     const result = await businessesService.list({
       city: req.params.citySlug,
+      verified: req.query.verified,
+      search: req.query.search,
       page: req.query.page,
       limit: req.query.limit,
       sort: req.query.sort,
@@ -84,6 +99,8 @@ async function getByCategoryAndCity(req, res, next) {
     const result = await businessesService.list({
       category: req.params.categorySlug,
       city: req.params.citySlug,
+      verified: req.query.verified,
+      search: req.query.search,
       page: req.query.page,
       limit: req.query.limit,
       sort: req.query.sort,
@@ -135,10 +152,21 @@ async function remove(req, res, next) {
   }
 }
 
+async function recordView(req, res, next) {
+  try {
+    await businessesService.recordView(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    next(err);
+  }
+}
+
 module.exports = {
   list,
   getFeatured,
   getRecent,
+  getHomepageSlots,
   getBySlug,
   getByCategory,
   getByCity,
@@ -147,4 +175,5 @@ module.exports = {
   create,
   update,
   remove,
+  recordView,
 };

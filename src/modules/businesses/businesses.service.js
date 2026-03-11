@@ -2,6 +2,7 @@ const { prisma } = require('../../config/db');
 const { slugify } = require('../../utils/slugify');
 const { paginate } = require('../../utils/paginate');
 const { sendEmail } = require('../../utils/sendEmail');
+const { getUnclaimedEmail } = require('../../utils/ensureUnclaimed');
 
 async function ensureUniqueSlug(baseSlug) {
   let slug = baseSlug;
@@ -18,6 +19,8 @@ function buildBusinessResponse(b) {
   const avgReview = b.reviews?.length
     ? b.reviews.reduce((s, r) => s + r.rating, 0) / b.reviews.length
     : null;
+  const ownerEmail = b.owner?.email;
+  const isUnclaimed = ownerEmail === getUnclaimedEmail();
   return {
     id: b.id,
     name: b.name,
@@ -34,7 +37,13 @@ function buildBusinessResponse(b) {
     featuredUntil: b.featuredUntil,
     premium: b.premium,
     premiumUntil: b.premiumUntil,
+    boosted: b.boosted,
+    boostedUntil: b.boostedUntil,
+    homepageSlotUntil: b.homepageSlotUntil,
+    cityAdUntil: b.cityAdUntil,
     verified: b.verified,
+    viewCount: b.viewCount ?? 0,
+    isUnclaimed: !!isUnclaimed,
     status: b.status,
     city: b.city ? { id: b.city.id, name: b.city.name, slug: b.city.slug, province: b.city.province } : null,
     categories: (b.businessCategories || []).map((bc) => ({
@@ -56,7 +65,7 @@ function buildBusinessResponse(b) {
 }
 
 async function list(filters) {
-  const { category, city, featured, status, plan, search, page, limit, sort } = filters || {};
+  const { category, city, featured, status, plan, search, verified, page, limit, sort } = filters || {};
   const where = {};
 
   if (category) {
@@ -74,6 +83,9 @@ async function list(filters) {
   if (plan) {
     where.listings = { some: { plan } };
   }
+  if (verified === true || verified === 'true' || verified === '1') {
+    where.verified = true;
+  }
   if (search) {
     where.OR = [
       { name: { contains: search, mode: 'insensitive' } },
@@ -85,7 +97,7 @@ async function list(filters) {
   const total = await prisma.business.count({ where });
   const { skip, limit: take } = paginate(page, limit, total);
 
-  let orderBy = [{ premium: 'desc' }, { featured: 'desc' }, { createdAt: 'desc' }];
+  let orderBy = [{ premium: 'desc' }, { featured: 'desc' }, { boosted: 'desc' }, { cityAdUntil: 'desc' }, { createdAt: 'desc' }];
   if (sort === 'az') orderBy = { name: 'asc' };
 
   const list = await prisma.business.findMany({
@@ -95,6 +107,7 @@ async function list(filters) {
     orderBy,
     include: {
       city: true,
+      owner: { select: { email: true } },
       businessCategories: { include: { category: true } },
       listings: { take: 1, orderBy: { createdAt: 'desc' } },
       media: true,
@@ -118,6 +131,7 @@ async function getFeatured(limit) {
     orderBy: [{ premium: 'desc' }, { featured: 'desc' }, { createdAt: 'desc' }],
     include: {
       city: true,
+      owner: { select: { email: true } },
       businessCategories: { include: { category: true } },
       listings: { take: 1 },
       media: true,
@@ -135,6 +149,27 @@ async function getRecent(limit) {
     orderBy: { createdAt: 'desc' },
     include: {
       city: true,
+      owner: { select: { email: true } },
+      businessCategories: { include: { category: true } },
+      listings: { take: 1 },
+      media: true,
+      reviews: true,
+    },
+  });
+  return list.map(buildBusinessResponse);
+}
+
+/** Phase 3: Homepage slot businesses (max 8, active slot only) */
+async function getHomepageSlots(limit) {
+  const take = Math.min(limit || 8, 8);
+  const now = new Date();
+  const list = await prisma.business.findMany({
+    where: { status: 'active', homepageSlotUntil: { gt: now } },
+    take,
+    orderBy: { homepageSlotUntil: 'desc' },
+    include: {
+      city: true,
+      owner: { select: { email: true } },
       businessCategories: { include: { category: true } },
       listings: { take: 1 },
       media: true,
@@ -149,6 +184,7 @@ async function getBySlug(slug) {
     where: { slug, status: 'active' },
     include: {
       city: true,
+      owner: { select: { email: true } },
       businessCategories: { include: { category: true } },
       businessServices: { include: { service: true } },
       businessServiceAreas: { include: { city: true } },
@@ -298,6 +334,7 @@ async function listByOwner(ownerId) {
     orderBy: { createdAt: 'desc' },
     include: {
       city: true,
+      owner: { select: { email: true } },
       businessCategories: { include: { category: true } },
       listings: { take: 1, orderBy: { createdAt: 'desc' } },
       media: true,
@@ -307,14 +344,27 @@ async function listByOwner(ownerId) {
   return list.map(buildBusinessResponse);
 }
 
+/** Phase 4: Increment view count (no auth; frontend calls when profile is viewed) */
+async function recordView(businessId) {
+  const business = await prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+  if (!business) throw Object.assign(new Error('Business not found'), { statusCode: 404 });
+  await prisma.business.update({
+    where: { id: businessId },
+    data: { viewCount: { increment: 1 } },
+  });
+  return { ok: true };
+}
+
 module.exports = {
   list,
   listByOwner,
   getFeatured,
   getRecent,
+  getHomepageSlots,
   getBySlug,
   create,
   update,
   remove,
+  recordView,
   buildBusinessResponse,
 };
