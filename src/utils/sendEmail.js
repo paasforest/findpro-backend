@@ -18,10 +18,11 @@ function getTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
     return null;
   }
+  const port = parseInt(process.env.SMTP_PORT, 10) || 587;
   transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10) || 587,
-    secure: false,
+    port,
+    secure: port === 465,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
@@ -30,8 +31,9 @@ function getTransporter() {
   return transporter;
 }
 
+// Sender must use verified domain mail.findpro.co.za (Resend). Set RESEND_FROM in .env if different.
 function getFrom() {
-  return process.env.RESEND_FROM || process.env.SMTP_USER || 'FindPro <noreply@mail.findpro.co.za>';
+  return process.env.RESEND_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || 'FindPro <noreply@mail.findpro.co.za>';
 }
 
 async function sendEmail({ to, subject, text, html }) {
@@ -68,7 +70,7 @@ async function sendEmail({ to, subject, text, html }) {
   }
 
   const mailOptions = {
-    from: process.env.SMTP_USER || 'noreply@findpro.co.za',
+    from: process.env.EMAIL_FROM || process.env.SMTP_USER || 'FindPro <noreply@mail.findpro.co.za>',
     to: toAddress,
     subject,
     text: plainText,

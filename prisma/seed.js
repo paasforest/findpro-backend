@@ -50,6 +50,8 @@ const cities = [
   { name: 'Ballito', province: 'KwaZulu-Natal', slug: 'ballito' },
   { name: 'Westville', province: 'KwaZulu-Natal', slug: 'westville' },
   { name: 'Rustenburg', province: 'North West', slug: 'rustenburg' },
+  { name: 'Hermanus', province: 'Western Cape', slug: 'hermanus' },
+  { name: 'Gansbaai', province: 'Western Cape', slug: 'gansbaai' },
 ];
 
 // Services per category (categorySlug -> list of { name, slug }). Enables filter-by-service like other directories.

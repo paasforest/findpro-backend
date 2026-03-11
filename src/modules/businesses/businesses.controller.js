@@ -107,7 +107,8 @@ async function getByCategoryAndCity(req, res, next) {
     });
     res.json(result);
   } catch (err) {
-    next(err);
+    console.warn('[getByCategoryAndCity]', err.message);
+    res.status(200).json({ data: [], pagination: { total: 0, totalPages: 0, page: 1 } });
   }
 }
 
