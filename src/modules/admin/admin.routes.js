@@ -202,6 +202,40 @@ const bulkImportRowSchema = z.object({
   category: z.string().min(1).max(100),
 });
 
+function normalizeNameForDedup(name) {
+  return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** SEO-friendly description templates per category. Helps Google understand the page. */
+const DESCRIPTION_TEMPLATES = {
+  electricians: (city) =>
+    `Professional electricians providing residential and commercial electrical services in ${city} including installations, repairs, COC certificates, fault finding, and emergency electrical work. Claim this listing to add your details.`,
+  plumbers: (city) =>
+    `Professional plumber in ${city} offering plumbing services including geyser installation, blocked drains, leak detection, bathroom plumbing, and emergency repairs. Claim this listing to add your details.`,
+  'solar-installers': (city) =>
+    `Solar installer in ${city} offering solar panel installation, inverters, batteries, and maintenance. Claim this listing to add your details.`,
+  builders: (city) =>
+    `Construction and building services in ${city} including renovations, new builds, extensions, and general contracting. Claim this listing to add your details.`,
+  painters: (city) =>
+    `Professional painters in ${city} offering interior and exterior painting, spray painting, and finishing services. Claim this listing to add your details.`,
+  'cleaning-services': (city) =>
+    `Cleaning services in ${city} including house cleaning, carpet cleaning, deep cleaning, and office cleaning. Claim this listing to add your details.`,
+  'security-cctv': (city) =>
+    `CCTV installation and security services in ${city} including alarms, access control, and electric fencing. Claim this listing to add your details.`,
+  'appliance-repair': (city) =>
+    `Appliance repair services in ${city} for fridge, washing machine, stove, and other household appliances. Claim this listing to add your details.`,
+  'pest-control': (city) =>
+    `Pest control services in ${city} including fumigation, rodent control, and termite treatment. Claim this listing to add your details.`,
+  'garden-landscaping': (city) =>
+    `Garden and landscaping services in ${city} including lawn maintenance, garden design, irrigation, and landscaping. Claim this listing to add your details.`,
+};
+
+function getDescriptionForCategory(categorySlug, cityName) {
+  const template = DESCRIPTION_TEMPLATES[categorySlug?.toLowerCase()];
+  const city = cityName || 'South Africa';
+  return template ? template(city) : `Professional service provider in ${city}. Claim this listing to add your description and take control of your listing on FindPro.`;
+}
+
 /** Bulk create unclaimed listings from JSON body. Body: { rows: [ { name, phone, city, category } ] } where city and category are slugs. */
 router.post('/businesses/bulk-import', async (req, res, next) => {
   try {
@@ -212,13 +246,15 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
     const unclaimedId = await getUnclaimedUserId();
     if (!unclaimedId) return res.status(500).json({ error: 'Unclaimed user not configured' });
 
-    const cities = await prisma.city.findMany({ select: { id: true, slug: true } });
+    const cities = await prisma.city.findMany({ select: { id: true, slug: true, name: true } });
     const categories = await prisma.category.findMany({ select: { id: true, slug: true } });
-    const cityBySlug = new Map(cities.map((c) => [c.slug.toLowerCase(), c.id]));
+    const cityBySlug = new Map(cities.map((c) => [c.slug.toLowerCase(), c]));
     const categoryBySlug = new Map(categories.map((c) => [c.slug.toLowerCase(), c.id]));
 
     const results = { created: 0, failed: 0, errors: [] };
-    const description = 'Claim this business to add your description and take control of your listing on FindPro.';
+
+    const seenInBatch = new Set();
+    const cityNamesCache = new Map();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -230,7 +266,8 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
         continue;
       }
       const { name, phone, city: citySlug, category: categorySlug } = parsed.data;
-      const cityId = cityBySlug.get(citySlug.toLowerCase());
+      const city = cityBySlug.get(citySlug.toLowerCase());
+      const cityId = city?.id;
       const categoryId = categoryBySlug.get(categorySlug.toLowerCase());
       if (!cityId) {
         results.failed++;
@@ -243,18 +280,30 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
         continue;
       }
 
-      const existing = await prisma.business.findFirst({
-        where: { name: { equals: name.trim(), mode: 'insensitive' }, cityId },
-      });
-      if (existing) {
+      const normalized = normalizeNameForDedup(name);
+      const dedupKey = `${normalized}|${cityId}`;
+      if (seenInBatch.has(dedupKey)) {
+        results.failed++;
+        results.errors.push({ row: rowNum, name, error: 'Duplicate in same import (same name + city)' });
+        continue;
+      }
+
+      if (!cityNamesCache.has(cityId)) {
+        cityNamesCache.set(cityId, await prisma.business.findMany({ where: { cityId }, select: { name: true } }));
+      }
+      const existingInCity = cityNamesCache.get(cityId);
+      const alreadyExists = existingInCity.some((b) => normalizeNameForDedup(b.name) === normalized);
+      if (alreadyExists) {
         results.failed++;
         results.errors.push({ row: rowNum, name, error: 'A business with this name already exists in this city' });
         continue;
       }
+      seenInBatch.add(dedupKey);
 
       try {
         const baseSlug = slugify(name);
         const slug = await ensureUniqueSlug(baseSlug);
+        const description = getDescriptionForCategory(categorySlug, city?.name);
         await prisma.business.create({
           data: {
             name: name.trim(),
@@ -270,6 +319,7 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
             listings: { create: { plan: 'free', status: 'active' } },
           },
         });
+        cityNamesCache.get(cityId).push({ name: name.trim() });
         results.created++;
       } catch (err) {
         results.failed++;
@@ -301,9 +351,14 @@ router.post('/businesses/unclaimed', async (req, res, next) => {
       return res.status(409).json({ error: 'A business with this name already exists in this city.' });
     }
 
+    const [city, primaryCategory] = await Promise.all([
+      prisma.city.findUnique({ where: { id: cityId }, select: { name: true } }),
+      prisma.category.findUnique({ where: { id: categoryIds[0] }, select: { slug: true } }),
+    ]);
+
     const baseSlug = slugify(name);
     const slug = await ensureUniqueSlug(baseSlug);
-    const description = 'Claim this business to add your description and take control of your listing on FindPro.';
+    const description = getDescriptionForCategory(primaryCategory?.slug, city?.name);
 
     const business = await prisma.business.create({
       data: {
