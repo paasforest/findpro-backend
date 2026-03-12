@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
+const { ensureUnclaimedUser, getUnclaimedUserId } = require('../src/utils/ensureUnclaimed');
 
 const prisma = new PrismaClient();
 
@@ -162,9 +163,9 @@ async function main() {
   });
 
   // Remove mock data and everything associated: mock businesses, their listings, reviews, media, payments, then demo pro account
+  // cape-plumbing-pros excluded: kept as permanent unclaimed listing so /business/cape-plumbing-pros does not 404
   const mockSlugs = [
     'spark-electric-solutions',
-    'cape-plumbing-pros',
     'sunpower-sa',
     'buildright-construction',
     'perfect-painters-jhb',
@@ -182,6 +183,36 @@ async function main() {
   const deletedUser = await prisma.user.deleteMany({ where: { email: 'demo@findpro.co.za' } });
   if (deletedUser.count > 0) {
     console.log('Removed demo pro account (demo@findpro.co.za).');
+  }
+
+  // Ensure cape-plumbing-pros exists (root cause fix for 404 on /business/cape-plumbing-pros)
+  await ensureUnclaimedUser();
+  const unclaimedId = await getUnclaimedUserId();
+  if (unclaimedId) {
+    const capeTown = await prisma.city.findUnique({ where: { slug: 'cape-town' } });
+    const plumbers = await prisma.category.findUnique({ where: { slug: 'plumbers' } });
+    if (capeTown && plumbers) {
+      await prisma.business.upsert({
+        where: { slug: 'cape-plumbing-pros' },
+        update: {},
+        create: {
+          name: 'Cape Plumbing Pros',
+          slug: 'cape-plumbing-pros',
+          description: 'Cape Plumbing Pros offers comprehensive plumbing services across Cape Town. From emergency repairs to complete bathroom renovations, our team handles it all with professionalism and expertise.',
+          phone: '+27 21 987 6543',
+          whatsapp: '27219876543',
+          website: 'https://capeplumbingpros.co.za',
+          cityId: capeTown.id,
+          ownerId: unclaimedId,
+          status: 'active',
+          source: 'manual',
+          businessCategories: { create: [{ categoryId: plumbers.id }] },
+          businessServiceAreas: { create: [{ cityId: capeTown.id }] },
+          listings: { create: { plan: 'free', status: 'active' } },
+        },
+      });
+      console.log('Ensured cape-plumbing-pros listing exists.');
+    }
   }
 
   // Backfill: ensure existing businesses have at least one service area (primary city)
