@@ -157,11 +157,12 @@ async function forgotPassword(email) {
     process.env.JWT_SECRET,
     { expiresIn: '1h' }
   );
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL || 'https://findpro.co.za'}/reset-password?token=${resetToken}`;
   await sendEmail({
     to: email,
     subject: 'FindPro – Reset your password',
-    text: `Open this link to reset your password: ${resetUrl}`,
+    text: `Open this link to reset your password: ${resetUrl}\n\nThe link expires in 1 hour.`,
+    html: `<p>Click the link below to reset your password:</p><p><a href="${resetUrl}">Reset password</a></p><p>The link expires in 1 hour. If you didn't request this, you can ignore this email.</p>`,
   });
   return { message: 'If that email exists, we sent a reset link.' };
 }

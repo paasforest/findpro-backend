@@ -252,27 +252,34 @@ async function create(ownerId, data) {
     },
   });
 
+  const frontendUrl = process.env.FRONTEND_URL || 'https://findpro.co.za';
+  const adminUrl = `${frontendUrl}/admin`;
+
   const adminEmail = process.env.ADMIN_EMAIL;
   if (adminEmail) {
     try {
       await sendEmail({
         to: adminEmail,
         subject: 'FindPro – New listing pending approval',
-        text: 'New business "' + data.name + '" submitted. Please review in admin.',
+        text: `New business "${data.name}" submitted. Review in admin: ${adminUrl}`,
+        html: `<p>New business <strong>${data.name}</strong> has been submitted.</p><p><a href="${adminUrl}">Review in Admin</a></p>`,
       });
     } catch (e) {
       console.warn('Admin notification email failed:', e.message);
     }
   }
 
-  const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { email: true } });
+  const owner = await prisma.user.findUnique({ where: { id: ownerId }, select: { email: true, name: true } });
   const toEmail = data.email || (owner && owner.email);
+  const ownerName = owner?.name || 'there';
   if (toEmail) {
     try {
+      const dashboardUrl = `${frontendUrl}/dashboard`;
       await sendEmail({
         to: toEmail,
-        subject: 'FindPro – Listing submitted',
-        text: 'Your listing "' + data.name + '" has been submitted and is pending approval.',
+        subject: 'FindPro – Your listing has been submitted',
+        text: `Hi ${ownerName}, your listing "${data.name}" has been submitted and is pending approval. We'll notify you when it's live. Dashboard: ${dashboardUrl}`,
+        html: `<p>Hi ${ownerName},</p><p>Your listing <strong>${data.name}</strong> has been submitted and is pending approval. We'll notify you by email when it's live.</p><p><a href="${dashboardUrl}">View your Dashboard</a></p>`,
       });
     } catch (e) {
       console.warn('Owner confirmation email failed:', e.message);
