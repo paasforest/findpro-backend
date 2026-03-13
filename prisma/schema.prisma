@@ -111,6 +111,7 @@ model Business {
   homepageSlotUntil     DateTime?            // Phase 3: R175 for 30 days; max 8 slots; cron expires
   cityAdUntil           DateTime?            // Phase 3: R200 for 30 days (primary city); cron expires
   viewCount             Int                  @default(0)  // Phase 4: profile views
+  claimInvitationSentAt DateTime?            // When admin sent claim invitation email (outreach tracking)
   status                BusinessStatus      @default(pending)
   source                BusinessSource       @default(manual)
   createdAt             DateTime             @default(now())

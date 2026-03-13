@@ -6,6 +6,7 @@ const { isAdmin } = require('../../middleware/isAdmin');
 const { getUnclaimedUserId } = require('../../utils/ensureUnclaimed');
 const { slugify } = require('../../utils/slugify');
 const { sendEmail } = require('../../utils/sendEmail');
+const claimService = require('../claim/claim.service');
 
 const router = express.Router();
 router.use(verifyToken, isAdmin);
@@ -329,6 +330,54 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
 
     res.json(results);
   } catch (err) {
+    next(err);
+  }
+});
+
+/** List unclaimed businesses (for outreach). Query: page, limit, contacted (0|1 to filter by invitation sent). */
+router.get('/businesses/unclaimed', async (req, res, next) => {
+  try {
+    const unclaimedId = await getUnclaimedUserId();
+    if (!unclaimedId) return res.status(500).json({ error: 'Unclaimed user not configured' });
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const contacted = req.query.contacted;
+    const where = { ownerId: unclaimedId, status: 'active' };
+    if (contacted === '1') where.claimInvitationSentAt = { not: null };
+    if (contacted === '0') where.claimInvitationSentAt = null;
+
+    const [list, total] = await Promise.all([
+      prisma.business.findMany({
+        where,
+        include: { city: true, businessCategories: { include: { category: true } } },
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.business.count({ where }),
+    ]);
+    res.json({
+      data: list,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Send claim invitation email to a business (admin). Body: { email } */
+const sendClaimInvitationSchema = z.object({ email: z.string().email() });
+router.post('/businesses/:id/send-claim-invitation', async (req, res, next) => {
+  try {
+    const parsed = sendClaimInvitationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    }
+    const result = await claimService.sendClaimInvitation(req.params.id, parsed.data.email);
+    res.json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     next(err);
   }
 });

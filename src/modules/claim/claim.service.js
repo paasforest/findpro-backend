@@ -41,6 +41,47 @@ async function requestClaim(businessId, email) {
   return { message: 'If that email is correct, we sent a claim link.', claimUrl: process.env.NODE_ENV === 'development' ? claimUrl : undefined };
 }
 
+/** Admin-initiated: send claim invitation to a business email. Marks claimInvitationSentAt. */
+async function sendClaimInvitation(businessId, email) {
+  const unclaimedId = await getUnclaimedUserId();
+  if (!unclaimedId) throw Object.assign(new Error('Unclaimed user not configured'), { statusCode: 500 });
+
+  const business = await prisma.business.findUnique({
+    where: { id: businessId },
+    select: { id: true, name: true, slug: true, ownerId: true },
+  });
+  if (!business) throw Object.assign(new Error('Business not found'), { statusCode: 404 });
+  if (business.ownerId !== unclaimedId) {
+    throw Object.assign(new Error('This business is already claimed'), { statusCode: 400 });
+  }
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + CLAIM_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+  await prisma.claimToken.create({
+    data: { businessId, email, token, expiresAt },
+  });
+
+  const claimUrl = `${frontendUrl}/claim?token=${token}`;
+  const subject = `Your business "${business.name}" is listed on FindPro – claim it`;
+  const text = `Hi,\n\n${business.name} has been listed on FindPro.co.za, South Africa's home services directory.\n\nClaim your free listing to add photos, update your details, and reach more customers:\n\n${claimUrl}\n\nThis link expires in ${CLAIM_EXPIRY_DAYS} days.\n\n— FindPro Team`;
+  const html = `<p>Hi,</p><p><strong>${business.name}</strong> has been listed on FindPro.co.za, South Africa's home services directory.</p><p><a href="${claimUrl}">Claim your free listing</a> to add photos, update your details, and reach more customers.</p><p>This link expires in ${CLAIM_EXPIRY_DAYS} days.</p><p>— FindPro Team</p>`;
+
+  try {
+    await sendEmail({ to: email, subject, text, html });
+  } catch (e) {
+    console.warn('Claim invitation email failed:', e.message);
+    throw Object.assign(new Error('Failed to send email: ' + e.message), { statusCode: 500 });
+  }
+
+  await prisma.business.update({
+    where: { id: businessId },
+    data: { claimInvitationSentAt: new Date() },
+  });
+
+  return { message: 'Claim invitation sent.', claimUrl: process.env.NODE_ENV === 'development' ? claimUrl : undefined };
+}
+
 async function verifyClaimToken(token) {
   const record = await prisma.claimToken.findUnique({
     where: { token },
@@ -121,4 +162,4 @@ async function completeClaim(token, userId) {
   return buildBusinessResponse(businessForResponse);
 }
 
-module.exports = { requestClaim, verifyClaimToken, completeClaim };
+module.exports = { requestClaim, sendClaimInvitation, verifyClaimToken, completeClaim };

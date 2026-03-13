@@ -20,6 +20,9 @@ const claimRoutes = require('./modules/claim/claim.routes');
 
 const app = express();
 
+// Required when behind nginx: use real client IP for rate limiting (otherwise all requests appear as 127.0.0.1)
+app.set('trust proxy', 1);
+
 app.use(helmet());
 // CORS root cause: with credentials: true the server must NOT use Access-Control-Allow-Origin: *
 // or the browser blocks the response ("Failed to fetch"). So we always reflect the request origin
