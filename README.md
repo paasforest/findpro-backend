@@ -68,4 +68,18 @@ API base: `http://localhost:5000`
 
 ## Deployment (Hetzner)
 
-See the main FindPro backend instructions for Nginx, PM2, and SSL setup.
+- **GitHub:** https://github.com/paasforest/findpro-backend
+- **Production:** https://api.findpro.co.za
+
+**Deploy from your machine:**
+```bash
+./deploy/deploy.sh
+```
+This rsyncs code to the server, runs `npm install`, `prisma migrate deploy`, and restarts PM2.
+
+**Push to GitHub:**
+```bash
+git push origin master
+```
+
+See `deploy/SERVER-SETUP.md` for Nginx, PM2, SSL, and first-time server setup.

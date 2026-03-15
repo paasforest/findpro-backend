@@ -62,7 +62,7 @@ certbot --nginx -d api.findpro.co.za
 
 ## 6. Deploy updates (after code changes)
 
-**Commit** in `findpro-backend/`: `git add -A && git commit -m "message"`. **Push:** repo not on GitHub by default; add remote and push to use Option A. To deploy new code to Hetzner:
+**Commit** in `findpro-backend/`: `git add -A && git commit -m "message"`. **Push:** `git push origin master` (repo: paasforest/findpro-backend). To deploy new code to Hetzner:
 
 **Option A – Git on server (recommended)**  
 If you’ve pushed the backend to a repo (e.g. GitHub) and cloned it on the server:
