@@ -64,8 +64,34 @@ async function sendClaimInvitation(businessId, email) {
 
   const claimUrl = `${frontendUrl}/claim?token=${token}`;
   const subject = `Your business "${business.name}" is listed on FindPro – claim it`;
-  const text = `Hi,\n\n${business.name} has been listed on FindPro.co.za, South Africa's home services directory.\n\nClaim your free listing to add photos, update your details, and reach more customers:\n\n${claimUrl}\n\nThis link expires in ${CLAIM_EXPIRY_DAYS} days.\n\n— FindPro Team`;
-  const html = `<p>Hi,</p><p><strong>${business.name}</strong> has been listed on FindPro.co.za, South Africa's home services directory.</p><p><a href="${claimUrl}">Claim your free listing</a> to add photos, update your details, and reach more customers.</p><p>This link expires in ${CLAIM_EXPIRY_DAYS} days.</p><p>— FindPro Team</p>`;
+  const text = `Hi,
+
+${business.name} has been listed on FindPro.co.za, South Africa's home services directory.
+
+Here's how to claim your free listing (takes less than a minute):
+
+1. Click this link: ${claimUrl}
+
+2. Sign in with your email (or create an account if you haven't yet)
+
+3. On the claim page, click the "Claim this business" button
+
+That's it! Once claimed, you can add photos, update your details, and reach more customers from your dashboard.
+
+This link expires in ${CLAIM_EXPIRY_DAYS} days.
+
+— FindPro Team`;
+  const html = `<p>Hi,</p>
+<p><strong>${business.name}</strong> has been listed on FindPro.co.za, South Africa's home services directory.</p>
+<p><strong>Here's how to claim your free listing</strong> (takes less than a minute):</p>
+<ol>
+  <li>Click this link: <a href="${claimUrl}">${claimUrl}</a></li>
+  <li>Sign in with your email (or create an account if you haven't yet)</li>
+  <li>On the claim page, click the <strong>"Claim this business"</strong> button</li>
+</ol>
+<p>That's it! Once claimed, you can add photos, update your details, and reach more customers from your dashboard.</p>
+<p>This link expires in ${CLAIM_EXPIRY_DAYS} days.</p>
+<p>— FindPro Team</p>`;
 
   try {
     await sendEmail({ to: email, subject, text, html });

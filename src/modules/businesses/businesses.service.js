@@ -351,6 +351,23 @@ async function listByOwner(ownerId) {
   return list.map(buildBusinessResponse);
 }
 
+async function getByOwnerAndId(ownerId, businessId) {
+  const business = await prisma.business.findFirst({
+    where: { id: businessId, ownerId },
+    include: {
+      city: true,
+      businessCategories: { include: { category: true } },
+      businessServices: { include: { service: true } },
+      businessServiceAreas: { include: { city: true } },
+      listings: { take: 1, orderBy: { createdAt: 'desc' } },
+      media: true,
+      reviews: { where: { status: 'approved' } },
+    },
+  });
+  if (!business) return null;
+  return buildBusinessResponse(business);
+}
+
 /** Phase 4: Increment view count (no auth; frontend calls when profile is viewed) */
 async function recordView(businessId) {
   const business = await prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
@@ -365,6 +382,7 @@ async function recordView(businessId) {
 module.exports = {
   list,
   listByOwner,
+  getByOwnerAndId,
   getFeatured,
   getRecent,
   getHomepageSlots,

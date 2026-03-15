@@ -86,12 +86,14 @@ router.put('/businesses/:id/approve', async (req, res, next) => {
     });
     try {
       if (business.owner?.email) {
-        const listingUrl = `${process.env.FRONTEND_URL || 'https://findpro.co.za'}/business/${business.slug}`;
+        const frontendUrl = process.env.FRONTEND_URL || 'https://findpro.co.za';
+        const listingUrl = `${frontendUrl}/business/${business.slug}`;
+        const dashboardUrl = `${frontendUrl}/dashboard`;
         await sendEmail({
           to: business.owner.email,
           subject: `Your listing "${business.name}" is now live – FindPro`,
-          text: `Hi ${business.owner.name || 'there'}, your listing "${business.name}" has been approved and is now live on FindPro. View it here: ${listingUrl}. Manage it from your dashboard.`,
-          html: `<p>Hi ${business.owner.name || 'there'},</p><p>Your listing <strong>${business.name}</strong> has been approved and is now live on FindPro.</p><p><a href="${listingUrl}">View your listing</a> · <a href="${process.env.FRONTEND_URL || 'https://findpro.co.za'}/dashboard">Dashboard</a></p>`,
+          text: `Hi ${business.owner.name || 'there'},\n\nYour listing "${business.name}" has been approved and is now live on FindPro.\n\nView it: ${listingUrl}\n\nComplete your profile to stand out: add a logo and photos from your dashboard. Listings with photos get more views.\n\nDashboard: ${dashboardUrl}`,
+          html: `<p>Hi ${business.owner.name || 'there'},</p><p>Your listing <strong>${business.name}</strong> has been approved and is now live on FindPro.</p><p><a href="${listingUrl}">View your listing</a> · <a href="${dashboardUrl}">Dashboard</a></p><p><strong>Complete your profile:</strong> Add a logo and photos from your dashboard. Listings with photos get more views.</p>`,
         });
       }
     } catch (e) {

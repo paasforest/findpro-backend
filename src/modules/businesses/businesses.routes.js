@@ -19,8 +19,24 @@ const createBusinessSchema = z.object({
   cityIds: z.array(z.string().uuid()).max(50).optional(), // service areas (cities this business serves)
 });
 
+const updateBusinessSchema = z.object({
+  description: z.string().min(50).max(1000).optional(),
+  address: z.string().max(500).optional(),
+  website: z.string().url().optional().or(z.literal('')),
+  email: z.string().email().optional().or(z.literal('')),
+});
+
 function validateCreate(req, res, next) {
   const result = createBusinessSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.flatten().fieldErrors });
+  }
+  req.body = result.data;
+  next();
+}
+
+function validateUpdate(req, res, next) {
+  const result = updateBusinessSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error.flatten().fieldErrors });
   }
@@ -33,6 +49,7 @@ router.get('/featured', businessesController.getFeatured);
 router.get('/recent', businessesController.getRecent);
 router.get('/homepage-slots', businessesController.getHomepageSlots);
 router.get('/mine', verifyToken, businessesController.getMine);
+router.get('/mine/:id', verifyToken, businessesController.getMineById);
 router.get('/category/:categorySlug', businessesController.getByCategory);
 router.get('/city/:citySlug', businessesController.getByCity);
 router.get('/category/:categorySlug/city/:citySlug', businessesController.getByCategoryAndCity);
@@ -40,7 +57,7 @@ router.post('/:id/record-view', businessesController.recordView);
 router.get('/:slug', businessesController.getBySlug);
 
 router.post('/', verifyToken, validateCreate, businessesController.create);
-router.put('/:id', verifyToken, businessesController.update);
+router.put('/:id', verifyToken, validateUpdate, businessesController.update);
 router.delete('/:id', verifyToken, businessesController.remove);
 
 module.exports = router;

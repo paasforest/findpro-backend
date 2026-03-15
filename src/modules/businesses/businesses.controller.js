@@ -121,6 +121,18 @@ async function getMine(req, res, next) {
   }
 }
 
+async function getMineById(req, res, next) {
+  try {
+    const business = await businessesService.getByOwnerAndId(req.user.id, req.params.id);
+    if (!business) {
+      return res.status(404).json({ error: 'Business not found' });
+    }
+    res.json(business);
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function create(req, res, next) {
   try {
     const business = await businessesService.create(req.user.id, req.body);
@@ -173,6 +185,7 @@ module.exports = {
   getByCity,
   getByCategoryAndCity,
   getMine,
+  getMineById,
   create,
   update,
   remove,
