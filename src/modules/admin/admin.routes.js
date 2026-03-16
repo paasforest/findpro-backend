@@ -336,7 +336,7 @@ router.post('/businesses/bulk-import', async (req, res, next) => {
   }
 });
 
-/** List unclaimed businesses (for outreach). Query: page, limit, contacted (0|1 to filter by invitation sent). */
+/** List unclaimed businesses (for outreach). Query: page, limit, contacted (0|1), noWebsiteNoViews (1 = filter: no website OR no views). */
 router.get('/businesses/unclaimed', async (req, res, next) => {
   try {
     const unclaimedId = await getUnclaimedUserId();
@@ -345,9 +345,21 @@ router.get('/businesses/unclaimed', async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const contacted = req.query.contacted;
+    const noWebsiteNoViews = req.query.noWebsiteNoViews === '1';
     const where = { ownerId: unclaimedId, status: 'active' };
     if (contacted === '1') where.claimInvitationSentAt = { not: null };
     if (contacted === '0') where.claimInvitationSentAt = null;
+    if (noWebsiteNoViews) {
+      where.AND = [
+        {
+          OR: [
+            { website: null },
+            { website: '' },
+            { viewCount: 0 },
+          ],
+        },
+      ];
+    }
 
     const [list, total] = await Promise.all([
       prisma.business.findMany({
