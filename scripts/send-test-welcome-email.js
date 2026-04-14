@@ -27,7 +27,15 @@ async function main() {
   console.log('Sending test welcome email...');
   try {
     const result = await sendEmail({ to, subject, text, html });
-    console.log('Sent. messageId:', result?.messageId ?? 'ok');
+    if (result?.messageId === null) {
+      console.error('Email was not sent (Resend returned an error — check RESEND_API_KEY and logs above).');
+      process.exit(1);
+    }
+    if (result?.messageId === 'local') {
+      console.warn('No email provider configured; message was only logged locally.');
+      process.exit(1);
+    }
+    console.log('Sent. messageId:', result.messageId);
   } catch (e) {
     console.error('Failed:', e.message);
     process.exit(1);
