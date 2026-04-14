@@ -1,7 +1,7 @@
 const { prisma } = require('../../config/db');
 const { slugify } = require('../../utils/slugify');
 const { paginate } = require('../../utils/paginate');
-const { sendEmail } = require('../../utils/sendEmail');
+const sendEmail = require('../../utils/sendEmail');
 const { getUnclaimedEmail } = require('../../utils/ensureUnclaimed');
 
 async function ensureUniqueSlug(baseSlug) {

@@ -5,7 +5,7 @@
  * Or set PAASFOREST_TEST_EMAIL in .env and run without args.
  */
 require('dotenv').config();
-const { sendEmail } = require('../src/utils/sendEmail');
+const sendEmail = require('../src/utils/sendEmail');
 
 const to = process.argv[2] || process.env.PAASFOREST_TEST_EMAIL || 'admin@paasforest.com';
 const name = to.split('@')[0].replace(/[._]/g, ' ') || 'there';
@@ -21,7 +21,7 @@ async function main() {
   console.log('Sending welcome email to', to, '...');
   try {
     const result = await sendEmail({ to, subject, text, html });
-    console.log('Sent. messageId:', result?.messageId ?? 'ok');
+    console.log('Sent. id:', result?.id ?? 'ok');
   } catch (e) {
     console.error('Failed:', e.message);
     process.exit(1);

@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { prisma } = require('../../config/db');
-const { sendEmail } = require('../../utils/sendEmail');
+const sendEmail = require('../../utils/sendEmail');
 const { getUnclaimedUserId } = require('../../utils/ensureUnclaimed');
 
 const CLAIM_EXPIRY_DAYS = 7;
