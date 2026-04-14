@@ -2,10 +2,14 @@
  * Send a test welcome email to a given address.
  * Usage: node scripts/send-test-welcome-email.js [email]
  * Example: node scripts/send-test-welcome-email.js christiaanbanda@gmail.com
- * Requires: .env with RESEND_API_KEY and EMAIL_FROM set.
+ * Requires: .env with RESEND_API_KEY (Resend SDK) or SMTP_* (Resend SMTP / other).
  */
 require('dotenv').config();
-const sendEmail = require('../src/utils/sendEmail');
+const { sendEmail } = require('../src/utils/sendEmail');
+
+function getFrom() {
+  return process.env.RESEND_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || 'FindPro <noreply@mail.findpro.co.za>';
+}
 
 const to = process.argv[2] || 'christiaanbanda@gmail.com';
 const name = to.split('@')[0].replace(/[._]/g, ' ') || 'there';
@@ -18,12 +22,12 @@ const text = `Hi ${name},\n\nWelcome to FindPro. You're one step away from getti
 const html = `<p>Hi ${name},</p><p>Welcome to <strong>FindPro</strong>. You're one step away from getting in front of customers.</p><ol><li>Verify your email using the link we just sent you.</li><li><a href="${addBusinessUrl}">Add your business</a></li><li>Once approved, your listing goes live. Upgrade to Featured or Premium from your dashboard to stand out.</li></ol><p><a href="${dashboardUrl}">Go to your Dashboard</a></p><p>Questions? Reply to this email or visit findpro.co.za.</p><p><em>(This was a test send from FindPro.)</em></p>`;
 
 async function main() {
-  console.log('From:', process.env.EMAIL_FROM);
+  console.log('From:', getFrom());
   console.log('To:', to);
   console.log('Sending test welcome email...');
   try {
     const result = await sendEmail({ to, subject, text, html });
-    console.log('Sent. id:', result?.id ?? 'ok');
+    console.log('Sent. messageId:', result?.messageId ?? 'ok');
   } catch (e) {
     console.error('Failed:', e.message);
     process.exit(1);

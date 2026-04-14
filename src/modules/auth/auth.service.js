@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { prisma } = require('../../config/db');
-const sendEmail = require('../../utils/sendEmail');
+const { sendEmail } = require('../../utils/sendEmail');
 
 const SALT_ROUNDS = 12;
 const VERIFICATION_EXPIRY_HOURS = 24;

@@ -2,7 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const { prisma } = require('../../config/db');
 const { verifyToken } = require('../../middleware/auth');
-const sendEmail = require('../../utils/sendEmail');
+const { sendEmail } = require('../../utils/sendEmail');
 
 const router = express.Router();
 

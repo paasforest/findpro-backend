@@ -1,6 +1,6 @@
 # FindPro – Email Notifications
 
-All emails are sent automatically via the **Resend SDK** (`src/utils/sendEmail.js`). Set `RESEND_API_KEY` and `EMAIL_FROM` in `.env` (see `.env.example`). The address must use your verified domain (e.g. `noreply@mail.findpro.co.za`).
+All emails are sent automatically (`src/utils/sendEmail.js`). **If `RESEND_API_KEY` is set**, mail goes via the **Resend SDK**. **Otherwise**, if `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` are set (e.g. Resend SMTP), mail goes via **Nodemailer**. Set `RESEND_FROM` or `EMAIL_FROM` for the sender; domain `mail.findpro.co.za` must be verified in Resend.
 
 ## Auth
 

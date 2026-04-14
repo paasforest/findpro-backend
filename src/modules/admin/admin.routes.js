@@ -5,7 +5,7 @@ const { verifyToken } = require('../../middleware/auth');
 const { isAdmin } = require('../../middleware/isAdmin');
 const { getUnclaimedUserId } = require('../../utils/ensureUnclaimed');
 const { slugify } = require('../../utils/slugify');
-const sendEmail = require('../../utils/sendEmail');
+const { sendEmail } = require('../../utils/sendEmail');
 const claimService = require('../claim/claim.service');
 
 const router = express.Router();
